@@ -1,6 +1,5 @@
 use crate::utils::{
-    add_extra_generic_param, numbered_vars, AttrParams, DeriveType, MultiFieldData,
-    State,
+    add_extra_generic_param, numbered_vars, AttrParams, DeriveType, MultiFieldData, State,
 };
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
@@ -55,11 +54,8 @@ pub fn expand(input: &DeriveInput, trait_name: &'static str) -> Result<TokenStre
         let mut matchers = vec![];
         let vars = &numbered_vars(original_types.len(), "");
         for multi_field_data in multi_field_datas {
-            let patterns: Vec<_> =
-                vars.iter().map(|var| quote!(#pattern_ref #var)).collect();
-            matchers.push(
-                multi_field_data.matcher(&multi_field_data.field_indexes, &patterns),
-            );
+            let patterns: Vec<_> = vars.iter().map(|var| quote!(#pattern_ref #var)).collect();
+            matchers.push(multi_field_data.matcher(&multi_field_data.field_indexes, &patterns));
         }
 
         let vars = if vars.len() == 1 {
@@ -87,8 +83,7 @@ pub fn expand(input: &DeriveInput, trait_name: &'static str) -> Result<TokenStre
             })
             .collect::<Vec<_>>()
             .join(", ");
-        let message =
-            format!("Only {} can be converted to {}", variant_names, output_type);
+        let message = format!("Only {} can be converted to {}", variant_names, output_type);
 
         let generics_impl;
         let (_, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -102,14 +97,14 @@ pub fn expand(input: &DeriveInput, trait_name: &'static str) -> Result<TokenStre
         let try_from = quote! {
             impl#impl_generics ::core::convert::TryFrom<#reference_with_lifetime #input_type#ty_generics> for
                 (#(#reference_with_lifetime #original_types),*) #where_clause {
-                type Error = &'static str;
+                type Error = (&'static str, #reference_with_lifetime #input_type#ty_generics);
 
                 #[allow(unused_variables)]
                 #[inline]
                 fn try_from(value: #reference_with_lifetime #input_type#ty_generics) -> ::core::result::Result<Self, Self::Error> {
                     match value {
                         #(#matchers)|* => ::core::result::Result::Ok(#vars),
-                        _ => ::core::result::Result::Err(#message),
+                        other => ::core::result::Result::Err((#message, other)),
                     }
                 }
             }
